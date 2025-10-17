@@ -7,10 +7,18 @@ int main() {
     
     cout << "Введите строку: ";
     while (getline(cin, input)) {
-        cout << input << '\n';
+        if (input == "\\q") {
+            cout << "Выход по команде '\\q'" << endl;
+            break;
+        }
+        
+        cout << input << endl;
         cout << "Введите строку: ";
     }
+
+    if (cin.eof()) {
+        cout << "\nВыход по команде Ctrl+D" << endl;
+    }
     
-    cout << "\nВыход по нажатию Ctrl+D" << '\n';
     return 0;
 }
