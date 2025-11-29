@@ -2,92 +2,112 @@
 #include <string>
 #include <fstream>
 #include <vector>
+#include <cstdlib>
+#include <sstream>
+#include <unistd.h>
+
 using namespace std;
 
-vector<string> load_history() {
-    vector<string> history;
-    ifstream file("kubsh_history.txt"); 
-    string line;
-    
-    while (getline(file, line)) {
-        if (!line.empty()) {
-            history.push_back(line);
-        }
+string get_history_path() {
+    const char* home = getenv("HOME");
+    if (home == nullptr) {
+        cerr << "HOME не найден, история сохраняется локально\n";
+        return "./.kubsh_history";
     }
-    return history;
+    return string(home) + "/.kubsh_history";
+}
+
+void load_history(vector<string>& history) {
+    string path = get_history_path();
+    ifstream file(path);
+    if (!file.is_open()) return;
+
+    string line;
+    while (getline(file, line)) {
+        if (!line.empty()) history.push_back(line);
+    }
 }
 
 void save_history(const vector<string>& history) {
-    ofstream file("kubsh_history.txt");
+    string path = get_history_path();
+    ofstream file(path, ios::trunc);
+    if (!file.is_open()) {
+        cerr << "Не удалось открыть " << path << " для записи\n";
+        return;
+    }
+
     for (const string& cmd : history) {
         file << cmd << "\n";
     }
 }
 
+static string strip_quotes(const string& s) {
+    if (s.size() >= 2) {
+        if ((s.front() == '"' && s.back() == '"') ||
+            (s.front() == '\'' && s.back() == '\'')) {
+            return s.substr(1, s.size() - 2);
+        }
+    }
+    return s;
+}
+
 void my_echo(const string& input) {
-    size_t echo_pos = input.find("echo");
-    if (echo_pos == string::npos) {
+    size_t pos = 4;
+    while (pos < input.size() && isspace((unsigned char)input[pos])) ++pos;
+
+    if (pos >= input.size()) {
+        cout << '\n';
         return;
     }
-    
-    size_t text_start = echo_pos + 4;
-    
-    while (text_start < input.length() && input[text_start] == ' ') {
-        text_start++;
-    }
-    
-    if (text_start < input.length()) {
-        string text = input.substr(text_start);
-        cout << text << '\n';
-    } else {
-        cout << '\n';
-    }
+
+    string args = input.substr(pos);
+    cout << strip_quotes(args) << '\n';
 }
 
 int main() {
-    vector<string> history = load_history();
+    vector<string> history;
+    load_history(history);
+
     string input;
-    
+
     while (true) {
-        cout << "Cmd: ";
-        
+
         if (!getline(cin, input)) {
             if (cin.eof()) {
-                cout << "Exit by Ctrl+d" << '\n';
+                cout << "\nExit by Ctrl+D\n";
                 break;
             }
             cin.clear();
             continue;
         }
-        
-        if (input == "\\q") {
-            cout << "Exit by '\\q'" << '\n';
-            break;
-        }
-        
+
         if (input.empty()) {
             continue;
         }
-        
+
         history.push_back(input);
-        
+
+        if (input == "\\q") {
+            cout << "Exit by '\\q'\n";
+            break;
+        }
+
         if (input == "history") {
-            cout << "История команд:" << '\n';
-            for (size_t i = 0; i < history.size(); i++) {
-                cout << i+1 << ": " << history[i] << '\n';
+            cout << "История команд:\n";
+            for (size_t i = 0; i < history.size(); ++i) {
+                cout << (i + 1) << ": " << history[i] << '\n';
             }
             continue;
         }
-        
-        if (input.find("echo") == 0) {
+
+        if (input.rfind("echo", 0) == 0) {
             my_echo(input);
             continue;
         }
-        
-        cout << input << '\n';
+
+        cout << "Неизвестная команда: " << input << "\n";
     }
-    
+
     save_history(history);
-    
     return 0;
 }
