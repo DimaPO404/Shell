@@ -64,6 +64,51 @@ void my_echo(const string& input) {
     cout << strip_quotes(args) << '\n';
 }
 
+void my_env(const string& input) {
+    size_t pos = 2;
+    while (pos < input.size() && isspace((unsigned char)input[pos])) ++pos;
+    if (pos >= input.size()) {
+        cout << "Использование: \\e $VAR или \\e VAR\n";
+        return;
+    }
+
+    size_t start = pos;
+    while (pos < input.size() && !isspace((unsigned char)input[pos])) ++pos;
+    string token = input.substr(start, pos - start);
+
+    if (!token.empty() && token[0] == '$') token = token.substr(1);
+
+    if (token.empty()) {
+        cout << "Имя переменной не указано\n";
+        return;
+    }
+
+    const char* val = getenv(token.c_str());
+    if (val == nullptr) {
+        cout << "Переменная окружения '" << token << "' не найдена\n";
+        return;
+    }
+
+    string value = string(val);
+
+    if (value.find(':') != string::npos) {
+        stringstream ss(value);
+        string part;
+        size_t idx = 1;
+        while (getline(ss, part, ':')) {
+            if (part.empty()) {
+                cout << idx << ": (пустой)\n";
+            } else {
+                cout << idx << ": " << part << '\n';
+            }
+            ++idx;
+        }
+    } else {
+        cout << value << '\n';
+    }
+}
+
+
 int main() {
     vector<string> history;
     load_history(history);
@@ -97,6 +142,11 @@ int main() {
             for (size_t i = 0; i < history.size(); ++i) {
                 cout << (i + 1) << ": " << history[i] << '\n';
             }
+            continue;
+        }
+
+        if (input.rfind("\\e", 0) == 0) {
+            my_env(input);
             continue;
         }
 
