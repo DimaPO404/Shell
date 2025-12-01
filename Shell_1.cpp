@@ -6,8 +6,14 @@
 #include <sstream>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <signal.h>
 
 using namespace std;
+
+void my_sighup(int) {
+    cout << "Configuration reloaded\n";
+    cout.flush();
+}
 
 string get_history_path() {
     const char* home = getenv("HOME");
@@ -146,6 +152,8 @@ bool execute_external(const string& input) {
 }
 
 int main() {
+    signal(SIGHUP, my_sighup);
+
     vector<string> history;
     load_history(history);
 
@@ -193,7 +201,7 @@ int main() {
             continue;
         }
 
-        cout << "Неизвестная команда: " << input << "\n";
+        cout << "Неизвестная командa: " << input << "\n";
     }
 
     save_history(history);
