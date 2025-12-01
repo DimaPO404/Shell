@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <sstream>
 #include <unistd.h>
+#include <sys/wait.h>
 
 using namespace std;
 
@@ -108,6 +109,41 @@ void my_env(const string& input) {
     }
 }
 
+vector<string> split_args(const string& input) {
+    stringstream sts(input);
+    vector<string> args;
+    string token;
+
+    while (sts >> token) {
+        args.push_back(token);
+    }
+    return args;
+}
+
+bool execute_external(const string& input) {
+    vector<string> args = split_args(input);
+    if (args.empty()) return false;
+
+    vector<char*> c_args;
+    for (string& s : args) c_args.push_back(&s[0]);
+    c_args.push_back(nullptr);
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork");
+        return true;
+    }
+
+    if (pid == 0) {
+        execvp(c_args[0], c_args.data());
+        perror("execvp");
+        exit(1);
+    }
+
+    int status;
+    waitpid(pid, &status, 0);
+    return true;
+}
 
 int main() {
     vector<string> history;
@@ -126,9 +162,7 @@ int main() {
             continue;
         }
 
-        if (input.empty()) {
-            continue;
-        }
+        if (input.empty()) continue;
 
         history.push_back(input);
 
@@ -152,6 +186,10 @@ int main() {
 
         if (input.rfind("echo", 0) == 0) {
             my_echo(input);
+            continue;
+        }
+
+        if (execute_external(input)) {
             continue;
         }
 
