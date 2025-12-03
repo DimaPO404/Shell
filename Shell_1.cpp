@@ -10,11 +10,6 @@
 
 using namespace std;
 
-void my_sighup(int) {
-    cout << "Configuration reloaded\n";
-    cout.flush();
-}
-
 string get_history_path() {
     const char* home = getenv("HOME");
     if (home == nullptr) {
@@ -42,7 +37,6 @@ void save_history(const vector<string>& history) {
         cerr << "Не удалось открыть " << path << " для записи\n";
         return;
     }
-
     for (const string& cmd : history) {
         file << cmd << "\n";
     }
@@ -103,11 +97,8 @@ void my_env(const string& input) {
         string part;
         size_t idx = 1;
         while (getline(ss, part, ':')) {
-            if (part.empty()) {
-                cout << idx << ": (пустой)\n";
-            } else {
-                cout << idx << ": " << part << '\n';
-            }
+            if (part.empty()) cout << idx << ": (пустой)\n";
+            else cout << idx << ": " << part << '\n';
             ++idx;
         }
     } else {
@@ -120,9 +111,7 @@ vector<string> split_args(const string& input) {
     vector<string> args;
     string token;
 
-    while (sts >> token) {
-        args.push_back(token);
-    }
+    while (sts >> token) args.push_back(token);
     return args;
 }
 
@@ -151,8 +140,37 @@ bool execute_external(const string& input) {
     return true;
 }
 
+void list_partitions(const string& input) {
+    vector<string> args = split_args(input);
+    if (args.size() != 2) {
+        cout << "Использование: \\l /dev/sda\n";
+        return;
+    }
+
+    string device = args[1];
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork");
+        return;
+    }
+
+    if (pid == 0) {
+        execlp("lsblk", "lsblk", device.c_str(), (char*)nullptr);
+        perror("lsblk");
+        exit(1);
+    }
+
+    waitpid(pid, nullptr, 0);
+}
+
+void sighup_handler(int) {
+    cout << "\nConfiguration reloaded\n";
+    cout.flush();
+}
+
 int main() {
-    signal(SIGHUP, my_sighup);
+    signal(SIGHUP, sighup_handler);
 
     vector<string> history;
     load_history(history);
@@ -181,9 +199,8 @@ int main() {
 
         if (input == "history") {
             cout << "История команд:\n";
-            for (size_t i = 0; i < history.size(); ++i) {
+            for (size_t i = 0; i < history.size(); ++i)
                 cout << (i + 1) << ": " << history[i] << '\n';
-            }
             continue;
         }
 
@@ -197,11 +214,16 @@ int main() {
             continue;
         }
 
+        if (input.rfind("\\l", 0) == 0) {
+            list_partitions(input);
+            continue;
+        }
+
         if (execute_external(input)) {
             continue;
         }
 
-        cout << "Неизвестная командa: " << input << "\n";
+        cout << "Неизвестная команда: " << input << "\n";
     }
 
     save_history(history);
